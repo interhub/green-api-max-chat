@@ -310,7 +310,6 @@ function ChatSession({ session, children }: { session: Credentials; children: Re
   )
 
   const enableNotifications = useCallback(async () => {
-    dispatch({ type: 'settingsError', error: null })
     try {
       await client.setSettings(REQUIRED_SETTINGS)
       if (!alive.current) return

@@ -102,6 +102,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         notificationsEnabled: action.enabled,
         webhookUrlSet: action.webhookUrlSet && !state.settingsApplying,
+        // Settings that already work, for example fixed in the console, outdate a failed attempt to change them.
+        settingsError: action.enabled ? null : state.settingsError,
       }
     case 'setWebhookUrlSet': {
       // The old webhookUrl stays in force until the new settings apply: the notice keeps saying so.
@@ -428,13 +430,14 @@ export function selectNeedsStatusCheck(state: ChatState): boolean {
 
 export function selectNotice(state: ChatState): Notice | null {
   if (state.offline) return { kind: 'offline' }
+  // A failed attempt to fix the settings shows its reason and the retry button over the notice it tried to clear.
+  if (state.settingsError !== null) return { kind: 'settingsFailed', message: state.settingsError }
   if (state.webhookUrlSet) return { kind: 'webhookUrlSet' }
   // Applying settings restarts the instance, so it reports "starting" for a while.
   if (state.settingsApplying) return { kind: 'settingsApplying' }
   if (state.instanceState !== null && state.instanceState !== 'authorized') {
     return { kind: 'notAuthorized', state: state.instanceState }
   }
-  if (state.settingsError !== null) return { kind: 'settingsFailed', message: state.settingsError }
   if (state.notificationsEnabled === false) return { kind: 'notificationsOff' }
   if (state.quota !== null) return { kind: 'quota', description: state.quota }
   return null

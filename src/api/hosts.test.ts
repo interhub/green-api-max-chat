@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { normalizeApiUrl, resolveApiUrls } from './hosts'
+import { isApiUrl, normalizeApiUrl, resolveApiUrls } from './hosts'
 
 beforeEach(() => {
   vi.stubEnv('VITE_GREEN_API_URL', '')
@@ -17,6 +17,17 @@ describe('resolveApiUrls', () => {
   ])('tries the shard of %s first, then the generic host', (idInstance, shardApiUrl) => {
     expect(resolveApiUrls(idInstance)).toEqual([shardApiUrl, 'https://api.green-api.com'])
   })
+
+  it.each(['3000000001', '3105000001', '300000001'])(
+    'tries the 3100 shard of the MAX docs second for %s',
+    (idInstance) => {
+      expect(resolveApiUrls(idInstance)).toEqual([
+        `https://${idInstance.slice(0, 4)}.api.green-api.com`,
+        'https://3100.api.green-api.com',
+        'https://api.green-api.com',
+      ])
+    },
+  )
 
   it('uses only the API URL given by the user', () => {
     expect(resolveApiUrls('3100000001', '  https://7103.api.green-api.com//  ')).toEqual([
@@ -67,5 +78,12 @@ describe('normalizeApiUrl', () => {
         message: 'Укажите API URL, начинающийся с https://',
       }),
     )
+    expect(isApiUrl(value)).toBe(false)
+  })
+
+  it('isApiUrl accepts what normalizeApiUrl accepts', () => {
+    expect(isApiUrl(' https://3100.api.green-api.com/ ')).toBe(true)
+    expect(isApiUrl('http://localhost:8787')).toBe(true)
+    expect(isApiUrl('https:3100.api.green-api.com')).toBe(false)
   })
 })

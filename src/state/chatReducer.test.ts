@@ -249,6 +249,27 @@ describe('chatReducer: local actions', () => {
     )
   })
 
+  it('forgets a failed settings change once the settings read fine', () => {
+    const failed = reduce(
+      initialChatState,
+      { type: 'setSettingsStatus', enabled: false, webhookUrlSet: true },
+      { type: 'settingsError', error: 'Ошибка' },
+    )
+    const stillBlocked: ChatAction = {
+      type: 'setSettingsStatus',
+      enabled: false,
+      webhookUrlSet: true,
+    }
+    expect(reduce(failed, stillBlocked).settingsError).toBe('Ошибка')
+    const fixed = reduce(failed, { type: 'setSettingsStatus', enabled: true, webhookUrlSet: false })
+    expect(fixed).toMatchObject({
+      notificationsEnabled: true,
+      webhookUrlSet: false,
+      settingsError: null,
+    })
+    expect(selectNotice(fixed)).toBeNull()
+  })
+
   it('does not report the old webhookUrl while the new settings apply', () => {
     const applying = reduce(initialChatState, { type: 'settingsApplying', applying: true })
     expect(reduce(applying, { type: 'setWebhookUrlSet', webhookUrlSet: true })).toBe(applying)
@@ -565,14 +586,14 @@ describe('selectors', () => {
     }
     expect(selectNotice(current)).toEqual({ kind: 'offline' })
     current = { ...current, offline: false }
+    expect(selectNotice(current)).toEqual({ kind: 'settingsFailed', message: 'Ошибка' })
+    current = { ...current, settingsError: null }
     expect(selectNotice(current)).toEqual({ kind: 'webhookUrlSet' })
     current = { ...current, webhookUrlSet: false }
     expect(selectNotice(current)).toEqual({ kind: 'settingsApplying' })
     current = { ...current, settingsApplying: false }
     expect(selectNotice(current)).toEqual({ kind: 'notAuthorized', state: 'notAuthorized' })
     current = { ...current, instanceState: 'authorized' }
-    expect(selectNotice(current)).toEqual({ kind: 'settingsFailed', message: 'Ошибка' })
-    current = { ...current, settingsError: null }
     expect(selectNotice(current)).toEqual({ kind: 'notificationsOff' })
     current = { ...current, notificationsEnabled: true }
     expect(selectNotice(current)).toEqual({ kind: 'quota', description: 'Лимит' })

@@ -3,6 +3,8 @@ import { sleep } from '@/lib/async'
 import type { AppEvent, GreenApiClient, ReceivedNotification } from '@/types'
 
 export const RECEIVE_TIMEOUT_SECONDS = 20
+/** Long polls after an error are short: the first empty answer reports the recovery within seconds. */
+const RECOVERY_RECEIVE_TIMEOUT_SECONDS = 5
 const REMEMBERED_RECEIPTS = 50
 const WEBHOOK_URL_PAUSE_MS = 10_000
 const INSTANCE_PAUSE_MS = 10_000
@@ -35,7 +37,10 @@ export async function runNotificationLoop(
   while (!signal.aborted) {
     let notification: ReceivedNotification | null
     try {
-      notification = await client.receiveNotification(RECEIVE_TIMEOUT_SECONDS, signal)
+      notification = await client.receiveNotification(
+        failing ? RECOVERY_RECEIVE_TIMEOUT_SECONDS : RECEIVE_TIMEOUT_SECONDS,
+        signal,
+      )
     } catch (error) {
       const code = isGreenApiError(error) ? error.code : 'unknown'
       if (signal.aborted || code === 'aborted') return

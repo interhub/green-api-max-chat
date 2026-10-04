@@ -11,7 +11,14 @@ import { createFakeClient, testCredentials } from './testing/fakeClient'
 
 vi.mock('@/api', async () => {
   const errors = await import('@/api/errors')
-  return { ...errors, createClient: vi.fn(), connect: vi.fn(), mapNotification: vi.fn() }
+  const { isApiUrl } = await import('@/api/hosts')
+  return {
+    ...errors,
+    isApiUrl,
+    createClient: vi.fn(),
+    connect: vi.fn(),
+    mapNotification: vi.fn(),
+  }
 })
 
 const input: LoginInput = {
@@ -87,6 +94,11 @@ describe('SessionProvider', () => {
       'Укажите API URL, начинающийся с https://',
     ],
     [{ apiUrl: '3100.api.green-api.com' }, 'apiUrl', 'Укажите API URL, начинающийся с https://'],
+    [
+      { apiUrl: 'https:3100.api.green-api.com' },
+      'apiUrl',
+      'Укажите API URL, начинающийся с https://',
+    ],
   ])('rejects %j without a request', async (patch, field, error) => {
     const session = renderSession()
     expect(await login(session, { ...input, ...patch })).toEqual({ ok: false, field, error })
@@ -127,19 +139,31 @@ describe('SessionProvider', () => {
     ],
     [
       new GreenApiError('forbidden', 'Неверный idInstance или адрес API.', 403),
-      { ok: false, field: 'idInstance', error: 'Неверный idInstance или адрес API.' },
+      { ok: false, field: 'apiUrl', error: 'Неверный idInstance или адрес API.' },
     ],
     [
       new GreenApiError('wrongHost', 'Этот адрес API не обслуживает указанный idInstance.', 404),
+      { ok: false, field: 'apiUrl', error: 'Этот адрес API не обслуживает указанный idInstance.' },
+    ],
+    [
+      new GreenApiError(
+        'network',
+        'Не удалось подключиться к GREEN-API. Проверьте интернет или укажите API URL из личного кабинета.',
+      ),
       {
         ok: false,
-        field: 'idInstance',
-        error: 'Этот адрес API не обслуживает указанный idInstance.',
+        field: 'apiUrl',
+        error:
+          'Не удалось подключиться к GREEN-API. Проверьте интернет или укажите API URL из личного кабинета.',
       },
     ],
     [
-      new GreenApiError('network', 'Не удалось подключиться к GREEN-API.'),
-      { ok: false, error: 'Не удалось подключиться к GREEN-API.' },
+      new GreenApiError('server', 'Сервис GREEN-API временно недоступен.', 500),
+      { ok: false, error: 'Сервис GREEN-API временно недоступен.' },
+    ],
+    [
+      new GreenApiError('instance', 'Инстанс сейчас не готов: инстанс удалён.', 400),
+      { ok: false, error: 'Инстанс сейчас не готов: инстанс удалён.' },
     ],
     [new Error('boom'), { ok: false, error: 'Не удалось войти. Попробуйте ещё раз.' }],
   ])('maps %s to the form', async (error, expected) => {

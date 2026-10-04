@@ -1,23 +1,23 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
-import { connect, isGreenApiError, type ConnectInput } from '@/api'
+import { connect, isApiUrl, isGreenApiError, type ConnectInput } from '@/api'
 import { clearSession, loadSession, saveSession } from '@/lib/storage'
-import type { Credentials, InstanceState, LoginInput, LoginResult, SessionApi } from '@/types'
+import type {
+  Credentials,
+  GreenApiErrorCode,
+  InstanceState,
+  LoginInput,
+  LoginResult,
+  SessionApi,
+} from '@/types'
 import { SessionContext } from './contexts'
 
 const LOGIN_FAILED = 'Не удалось войти. Попробуйте ещё раз.'
+/** Errors of the host rather than of the token: the user fixes them in the API URL field. */
+const API_URL_ERRORS = new Set<GreenApiErrorCode>(['wrongHost', 'forbidden', 'network'])
 
 type CheckedInput =
   | { ok: true; input: ConnectInput }
   | { ok: false; error: string; field: 'idInstance' | 'apiTokenInstance' | 'apiUrl' }
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const { protocol } = new URL(value)
-    return protocol === 'https:' || protocol === 'http:'
-  } catch {
-    return false
-  }
-}
 
 function checkInput(input: LoginInput): CheckedInput {
   const idInstance = input.idInstance.trim()
@@ -29,7 +29,7 @@ function checkInput(input: LoginInput): CheckedInput {
   if (!apiTokenInstance) {
     return { ok: false, field: 'apiTokenInstance', error: 'Введите apiTokenInstance.' }
   }
-  if (apiUrl && !isHttpUrl(apiUrl)) {
+  if (apiUrl && !isApiUrl(apiUrl)) {
     return { ok: false, field: 'apiUrl', error: 'Укажите API URL, начинающийся с https://' }
   }
   return { ok: true, input: { idInstance, apiTokenInstance, apiUrl: apiUrl || undefined } }
@@ -39,9 +39,7 @@ function toLoginError(error: unknown): LoginResult {
   if (!isGreenApiError(error)) return { ok: false, error: LOGIN_FAILED }
   const message = error.message || LOGIN_FAILED
   if (error.code === 'auth') return { ok: false, field: 'apiTokenInstance', error: message }
-  if (error.code === 'forbidden' || error.code === 'wrongHost') {
-    return { ok: false, field: 'idInstance', error: message }
-  }
+  if (API_URL_ERRORS.has(error.code)) return { ok: false, field: 'apiUrl', error: message }
   return { ok: false, error: message }
 }
 

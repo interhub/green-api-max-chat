@@ -25,6 +25,22 @@ export const enabledSettings: InstanceSettings = {
 
 type QueueItem = ReceivedNotification | GreenApiError | null
 
+/** receiveNotification of an empty queue as GREEN-API answers it: null after receiveTimeout seconds. */
+export function emptyLongPoll(receiveTimeout: number, signal?: AbortSignal): Promise<null> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new GreenApiError('aborted', ''))
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve(null)
+    }, receiveTimeout * 1000)
+    if (signal?.aborted) onAbort()
+    else signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 /**
  * A GreenApiClient for tests. Every method is a vi.fn; receiveNotification serves a queue that the test fills and
  * waits (like the real long poll) until something is queued or the signal aborts.

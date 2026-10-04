@@ -14,7 +14,12 @@ import type {
 } from '@/types'
 import { ChatProvider } from './ChatProvider'
 import { SessionContext, useChat } from './contexts'
-import { createFakeClient, testCredentials, type FakeClient } from './testing/fakeClient'
+import {
+  createFakeClient,
+  emptyLongPoll,
+  testCredentials,
+  type FakeClient,
+} from './testing/fakeClient'
 
 vi.mock('@/api', async () => {
   const errors = await import('@/api/errors')
@@ -355,6 +360,55 @@ describe('ChatProvider: notifications settings', () => {
       message: 'Неверный запрос: Validation failed',
     })
   })
+
+  it('shows why clearing the webhookUrl failed instead of the webhookUrl notice and retries', async () => {
+    fake.client.getSettings.mockResolvedValue({
+      webhookUrl: 'https://example.com',
+      incomingWebhook: 'yes',
+    })
+    fake.client.setSettings.mockRejectedValueOnce(
+      new GreenApiError('server', 'Сервис GREEN-API временно недоступен.', 500),
+    )
+    const chat = renderChat()
+    await flush()
+    expect(chat.api.notice).toEqual({ kind: 'webhookUrlSet' })
+    await act(() => chat.api.enableNotifications())
+    const failed = { kind: 'settingsFailed', message: 'Сервис GREEN-API временно недоступен.' }
+    expect(chat.api.notice).toEqual(failed)
+
+    const answer = deferred<void>()
+    fake.client.setSettings.mockReturnValueOnce(answer.promise)
+    let retrying: Promise<void> = Promise.resolve()
+    act(() => {
+      retrying = chat.api.enableNotifications()
+    })
+    expect(chat.api.notice).toEqual(failed)
+    await act(async () => {
+      answer.resolve()
+      await retrying
+    })
+    expect(fake.client.setSettings).toHaveBeenCalledTimes(2)
+    expect(chat.api.notice).toEqual({ kind: 'settingsApplying' })
+  })
+
+  it('drops the failed settings notice when the webhookUrl is cleared in the console', async () => {
+    fake.client.getSettings
+      .mockResolvedValueOnce({ webhookUrl: 'https://example.com', incomingWebhook: 'yes' })
+      .mockResolvedValueOnce({ webhookUrl: '', incomingWebhook: 'yes' })
+    fake.client.setSettings.mockRejectedValueOnce(
+      new GreenApiError('server', 'Сервис GREEN-API временно недоступен.', 500),
+    )
+    const chat = renderChat()
+    await flush()
+    await act(() => chat.api.enableNotifications())
+    fake.pushError(new GreenApiError('webhookUrlSet', WEBHOOK_URL_ERROR, 400))
+    await flush()
+    expect(chat.api.notice).toMatchObject({ kind: 'settingsFailed' })
+    fake.pushNotification(null)
+    await flush(10_000)
+    expect(fake.client.getSettings).toHaveBeenCalledTimes(2)
+    expect(chat.api.notice).toBeNull()
+  })
 })
 
 describe('ChatProvider: sending', () => {
@@ -633,6 +687,22 @@ describe('ChatProvider: receiving', () => {
     fake.pushNotification(null)
     await flush(1_000)
     expect(chat.api.notice).toBeNull()
+  })
+
+  it('clears the offline notice when the first short poll after the recovery ends', async () => {
+    fake.client.receiveNotification
+      .mockRejectedValueOnce(new GreenApiError('network', 'Нет связи с GREEN-API.'))
+      .mockImplementation(emptyLongPoll)
+    const chat = renderChat()
+    await flush()
+    expect(chat.api.notice).toEqual({ kind: 'offline' })
+    await flush(5_999)
+    expect(chat.api.notice).toEqual({ kind: 'offline' })
+    await flush(1)
+    expect(chat.api.notice).toBeNull()
+    expect(fake.client.receiveNotification.mock.calls.map(([timeout]) => timeout)).toEqual([
+      20, 5, 20,
+    ])
   })
 
   it('logs out when polling reports rejected credentials', async () => {

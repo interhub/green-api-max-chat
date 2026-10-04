@@ -3,7 +3,7 @@ import { mapNotification } from '@/api'
 import { GreenApiError } from '@/api/errors'
 import type { AppEvent, InstanceState } from '@/types'
 import { RECEIVE_TIMEOUT_SECONDS, runNotificationLoop } from './notificationLoop'
-import { createFakeClient, type FakeClient } from './testing/fakeClient'
+import { createFakeClient, emptyLongPoll, type FakeClient } from './testing/fakeClient'
 
 vi.mock('@/api', async () => {
   const errors = await import('@/api/errors')
@@ -38,6 +38,10 @@ function start(handlers = createHandlers()) {
 
 function receiveCalls(): number {
   return fake.client.receiveNotification.mock.calls.length
+}
+
+function receiveTimeouts(): number[] {
+  return fake.client.receiveNotification.mock.calls.map(([receiveTimeout]) => receiveTimeout)
 }
 
 beforeEach(() => {
@@ -149,6 +153,45 @@ describe('runNotificationLoop', () => {
     ])
     expect(handlers.onOnline).toHaveBeenCalledOnce()
     expect(receiveCalls()).toBe(10)
+  })
+
+  it('polls with a 5 second timeout after any error until the first success', async () => {
+    fake.pushError(new GreenApiError('network', 'Нет связи с GREEN-API.'))
+    fake.pushError(
+      new GreenApiError('rateLimit', 'Слишком много запросов. Подождите секунду.', 429),
+    )
+    fake.pushError(
+      new GreenApiError('webhookUrlSet', 'В настройках инстанса указан webhookUrl.', 400),
+    )
+    fake.pushError(
+      new GreenApiError('instance', 'Инстанс сейчас не готов: инстанс запускается.', 400),
+    )
+    fake.pushNotification(null)
+    fake.pushNotification(null)
+    const { handlers } = start()
+    await vi.advanceTimersByTimeAsync(23_000)
+    expect(receiveTimeouts()).toEqual([20, 5, 5, 5, 5, 20, 20])
+    expect(handlers.onOnline).toHaveBeenCalledOnce()
+  })
+
+  it('reports the recovery when the first short poll ends, not after a full long poll', async () => {
+    const onlineAt: number[] = []
+    const handlers = createHandlers()
+    handlers.onOnline.mockImplementation(() => {
+      onlineAt.push(Date.now())
+    })
+    fake.client.receiveNotification
+      .mockRejectedValueOnce(
+        new GreenApiError('server', 'Сервис GREEN-API временно недоступен.', 500),
+      )
+      .mockRejectedValueOnce(new GreenApiError('network', 'Нет связи с GREEN-API.'))
+      .mockImplementation(emptyLongPoll)
+    const startedAt = Date.now()
+    start(handlers)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(handlers.onOffline).toHaveBeenCalledTimes(2)
+    expect(onlineAt.map((time) => time - startedAt)).toEqual([8_000])
+    expect(receiveTimeouts()).toEqual([20, 5, 5, 20, 20])
   })
 
   it('waits 10 seconds after a webhookUrl error and reports the recovery', async () => {

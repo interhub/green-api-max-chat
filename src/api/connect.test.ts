@@ -7,6 +7,11 @@ const SHARD_STATE_URL = 'https://3100.api.green-api.com/waInstance3100000001/get
 const GENERIC_STATE_URL = 'https://api.green-api.com/waInstance3100000001/getStateInstance/token'
 const NGINX_404 =
   '<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>'
+const FALLBACK_REJECTION =
+  'Неверный idInstance или apiTokenInstance. Если данные верны, укажите API URL из личного кабинета.'
+/** An id of the MAX docs that is served by the 3100 shard although it starts with 3000. */
+const DOCS_INPUT = { idInstance: '3000000001', apiTokenInstance: 'token' }
+const docsStateUrl = (host: string) => `https://${host}/waInstance3000000001/getStateInstance/token`
 
 const authorized = () => json({ stateInstance: 'authorized' })
 const unreachable = () => new TypeError('Failed to fetch')
@@ -97,11 +102,70 @@ describe('connect: host detection', () => {
       await expect(connect(INPUT)).rejects.toMatchObject({
         code,
         status,
-        message:
-          'Неверный idInstance или apiTokenInstance. Если данные верны, укажите API URL из личного кабинета.',
+        message: FALLBACK_REJECTION,
       })
     },
   )
+
+  it('tries the 3100 shard of the MAX docs when the shard of an id starting with 3 fails', async () => {
+    const fetchMock = stubFetch(unreachable(), authorized())
+
+    const { client } = await connect(DOCS_INPUT)
+
+    expect(client.credentials.apiUrl).toBe('https://3100.api.green-api.com')
+    expect(requestedUrls(fetchMock)).toEqual([
+      docsStateUrl('3000.api.green-api.com'),
+      docsStateUrl('3100.api.green-api.com'),
+    ])
+  })
+
+  it.each([
+    ['a 404', () => reply(404, NGINX_404)],
+    ['a 403', () => reply(403)],
+    ['no answer', unreachable],
+  ])('goes on to the generic host after %s of the 3100 shard', async (_label, answer) => {
+    const fetchMock = stubFetch(unreachable(), answer(), authorized())
+
+    const { client } = await connect(DOCS_INPUT)
+
+    expect(client.credentials.apiUrl).toBe('https://api.green-api.com')
+    expect(requestedUrls(fetchMock)).toEqual([
+      docsStateUrl('3000.api.green-api.com'),
+      docsStateUrl('3100.api.green-api.com'),
+      docsStateUrl('api.green-api.com'),
+    ])
+  })
+
+  it('stops at a 401 of the 3100 shard without blaming the data alone', async () => {
+    const fetchMock = stubFetch(unreachable(), reply(401))
+
+    await expect(connect(DOCS_INPUT)).rejects.toMatchObject({
+      code: 'auth',
+      status: 401,
+      message: FALLBACK_REJECTION,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('suggests the API URL when none of the three hosts serves the id', async () => {
+    stubFetch(unreachable(), reply(404, NGINX_404), reply(404, NGINX_404))
+
+    await expect(connect(DOCS_INPUT)).rejects.toMatchObject({
+      code: 'wrongHost',
+      status: 404,
+      message: FALLBACK_REJECTION,
+    })
+  })
+
+  it('explains that none of the three hosts could be reached', async () => {
+    stubFetch(unreachable(), unreachable(), unreachable())
+
+    await expect(connect(DOCS_INPUT)).rejects.toMatchObject({
+      code: 'network',
+      message:
+        'Не удалось подключиться к GREEN-API. Проверьте интернет или укажите API URL из личного кабинета.',
+    })
+  })
 
   it('keeps the last error when only some hosts were unreachable', async () => {
     stubFetch(reply(404, NGINX_404), unreachable())
@@ -128,7 +192,10 @@ describe('connect: host detection', () => {
 
     await expect(
       connect({ ...INPUT, apiUrl: ' https://7103.api.green-api.com/ ' }),
-    ).rejects.toMatchObject({ code: 'wrongHost' })
+    ).rejects.toMatchObject({
+      code: 'wrongHost',
+      message: 'Этот адрес API не обслуживает указанный idInstance.',
+    })
     expect(requestedUrls(fetchMock)).toEqual([
       'https://7103.api.green-api.com/waInstance3100000001/getStateInstance/token',
     ])

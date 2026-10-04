@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Веб-чат для мессенджера MAX на базе GREEN-API" />
+    <meta name="theme-color" content="#17181c" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Чат для MAX</title>
+    <script>
+      ;(function () {
+        var theme = null
+        try {
+          theme = localStorage.getItem('max-chat:theme')
+        } catch (error) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark'
+        }
+        document.documentElement.setAttribute('data-theme', theme)
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

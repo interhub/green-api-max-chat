@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/interhub/green-api-max-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/interhub/green-api-max-chat/actions/workflows/ci.yml)
 
-- Сервис в интернете: @@LIVE_URL@@
+- Сервис в интернете: https://personal-info.ru/green-api-max-chat/
 - Скриншоты: [docs/screenshots](docs/screenshots)
 - Видео: [docs/demo.mp4](docs/demo.mp4)
 

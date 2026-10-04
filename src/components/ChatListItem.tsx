@@ -1,7 +1,7 @@
 import type { Chat, ChatMessage } from '@/types'
 import { Avatar } from '@/ui/Avatar'
 import { cx } from '@/ui/cx'
-import { formatListTime } from '@/ui/format'
+import { formatListTime, isValidTimestamp } from '@/ui/format'
 import { DeliveryStatus } from './DeliveryStatus'
 
 interface ChatListItemProps {
@@ -12,8 +12,8 @@ interface ChatListItemProps {
   onSelect(chatId: string): void
 }
 
-function Preview({ chat, message }: { chat: Chat; message?: ChatMessage }) {
-  if (!message) return <span className="text-fg-mute">Нет сообщений</span>
+function LastMessageText({ chat, message }: { chat: Chat; message?: ChatMessage }) {
+  if (!message) return <span>Нет сообщений</span>
   const author =
     message.direction === 'out'
       ? 'Вы: '
@@ -40,14 +40,16 @@ function UnreadBadge({ count }: { count: number }) {
   )
 }
 
-/** One MAX chat cell: 64px avatar, title + time, two-line preview + unread counter. */
+/** One MAX chat cell: 64px avatar, title + time, two lines of the last message + unread counter. */
 export function ChatListItem({ chat, lastMessage, selected, now, onSelect }: ChatListItemProps) {
-  const time = formatListTime(lastMessage?.timestamp ?? chat.updatedAt, now)
+  const timestamp = lastMessage?.timestamp ?? chat.updatedAt
+  const time = isValidTimestamp(timestamp) ? formatListTime(timestamp, now) : ''
   const outgoing = lastMessage?.direction === 'out' ? lastMessage : undefined
 
   return (
     <button
       type="button"
+      data-chat-id={chat.id}
       aria-current={selected ? 'true' : undefined}
       onClick={() => onSelect(chat.id)}
       className={cx(
@@ -62,8 +64,8 @@ export function ChatListItem({ chat, lastMessage, selected, now, onSelect }: Cha
         {outgoing && <DeliveryStatus status={outgoing.status} tone="list" decorative />}
         {time}
       </span>
-      <span className="col-start-2 row-start-2 line-clamp-2 min-h-[42px] pt-0.5 text-detail break-words text-fg-3">
-        <Preview chat={chat} message={lastMessage} />
+      <span className="col-start-2 row-start-2 line-clamp-2 min-h-[42px] pt-0.5 text-detail wrap-anywhere text-fg-3">
+        <LastMessageText chat={chat} message={lastMessage} />
       </span>
       <span className="col-start-3 row-start-2 mt-0.5 ml-3 flex h-8 items-start justify-end">
         {chat.unread > 0 && <UnreadBadge count={chat.unread} />}

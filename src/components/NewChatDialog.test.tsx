@@ -1,7 +1,7 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ChatApi, StartChatResult } from '@/types'
 import { NewChatDialog } from './NewChatDialog'
 
@@ -24,7 +24,7 @@ describe('NewChatDialog', () => {
     const phone = screen.getByLabelText('Номер телефона')
     expect(phone).toHaveFocus()
     expect(phone).toHaveAttribute('type', 'tel')
-    expect(phone).toHaveAccessibleDescription('Поддерживаются номера России (+7) и Беларуси (+375)')
+    expect(phone).toHaveAccessibleDescription('Номера России (+7) и Беларуси (+375)')
 
     await user.type(phone, '+7 900 123-45-67')
     await user.click(screen.getByRole('button', { name: 'Начать чат' }))
@@ -43,7 +43,11 @@ describe('NewChatDialog', () => {
     await user.type(screen.getByLabelText('Номер телефона'), '79001110000{Enter}')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Этот номер не найден в MAX.')
-    expect(screen.getByLabelText('Номер телефона')).toHaveAttribute('aria-invalid', 'true')
+    const phone = screen.getByLabelText('Номер телефона')
+    expect(phone).toHaveAttribute('aria-invalid', 'true')
+    expect(phone).toHaveAccessibleDescription(
+      'Этот номер не найден в MAX. Номера России (+7) и Беларуси (+375)',
+    )
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -60,6 +64,19 @@ describe('NewChatDialog', () => {
     const submit = screen.getByRole('button', { name: 'Начать чат' })
     expect(submit).toBeDisabled()
     expect(submit).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('closes on a click on the backdrop, not after a text selection that ends there', () => {
+    const { onClose } = renderDialog(vi.fn<ChatApi['startChat']>())
+    const dialog = screen.getByRole('dialog', { name: 'Новый чат' })
+
+    fireEvent.pointerDown(screen.getByLabelText('Номер телефона'))
+    fireEvent.click(dialog)
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.pointerDown(dialog)
+    fireEvent.click(dialog)
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('closes on Escape and on "Отмена"', async () => {

@@ -2,7 +2,7 @@ import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import type { ChatMessage } from '@/types'
 import { Avatar } from '@/ui/Avatar'
 import { cx } from '@/ui/cx'
-import { formatClock, pickByKey } from '@/ui/format'
+import { formatClock, isValidTimestamp, pickByKey } from '@/ui/format'
 import { linkify } from '@/ui/linkify'
 import { DeliveryStatus } from './DeliveryStatus'
 import type { StackPosition } from './timeline'
@@ -47,6 +47,11 @@ interface MessageBubbleProps {
   onRetry(messageId: string): void
 }
 
+function MessageTime({ timestamp }: { timestamp: number }) {
+  if (!isValidTimestamp(timestamp)) return null
+  return <time dateTime={new Date(timestamp).toISOString()}>{formatClock(timestamp)}</time>
+}
+
 export function MessageBubble({
   message,
   position,
@@ -78,7 +83,7 @@ export function MessageBubble({
         <div
           data-side={side}
           className={cx(
-            'relative max-w-[480px] min-w-[72px] rounded-bubble px-2.5 pt-2 pb-2.5 bubble-fill',
+            'relative max-w-[min(480px,100%)] min-w-[72px] rounded-bubble px-2.5 pt-2 pb-2.5 bubble-fill',
             outgoing ? 'bubble-outgoing' : 'bubble-incoming',
             CORNERS[side][position],
           )}
@@ -93,14 +98,14 @@ export function MessageBubble({
           )}
           <p
             className={cx(
-              'text-message break-words whitespace-pre-wrap',
-              message.kind === 'unsupported' && 'text-[var(--bubble-text-secondary)] italic',
+              'text-message wrap-anywhere whitespace-pre-wrap',
+              message.kind === 'unsupported' && 'text-bubble-muted italic',
             )}
           >
             {message.kind === 'text'
               ? linkify(
                   message.text,
-                  'text-[var(--bubble-link)] underline decoration-1 underline-offset-2 hover:decoration-2',
+                  'text-bubble-link underline decoration-1 underline-offset-2 hover:decoration-2',
                 )
               : message.text}
             <span
@@ -108,22 +113,20 @@ export function MessageBubble({
               className={cx('inline-block h-3.5', outgoing ? 'w-[58px]' : 'w-10')}
             />
           </p>
-          <span className="absolute right-2.5 bottom-1 flex items-center gap-0.5 text-bubble-tag text-[var(--bubble-time)] tabular-nums">
-            <time dateTime={new Date(message.timestamp).toISOString()}>
-              {formatClock(message.timestamp)}
-            </time>
+          <span className="absolute right-2.5 bottom-1 flex items-center gap-0.5 text-bubble-tag text-bubble-time tabular-nums">
+            <MessageTime timestamp={message.timestamp} />
             {outgoing && <DeliveryStatus status={message.status} tone="bubble" />}
           </span>
         </div>
         {failed && (
-          <div className="mt-1 flex max-w-[480px] flex-wrap items-center justify-end gap-1.5">
-            <span className="rounded-capsule bg-capsule px-2 py-0.5 text-label text-white">
+          <div className="mt-1 flex max-w-full flex-wrap items-center justify-end gap-1.5">
+            <span className="rounded-capsule bg-capsule px-2 py-0.5 text-label text-white backdrop-blur-[25px]">
               {message.error ?? 'Не отправлено'}
             </span>
             <button
               type="button"
               onClick={() => onRetry(message.id)}
-              className="inline-flex h-6 items-center gap-1 rounded-capsule bg-accent px-2 text-label font-medium text-white transition-transform duration-100 hover:bg-accent-hover active:scale-[0.96] active:bg-accent-pressed"
+              className="inline-flex h-8 items-center gap-1 rounded-capsule bg-accent px-2.5 text-label font-medium text-white transition-transform duration-100 hover:bg-accent-hover active:scale-[0.96] active:bg-accent-pressed"
             >
               <ArrowClockwiseIcon size={14} aria-hidden="true" />
               Повторить

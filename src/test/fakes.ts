@@ -1,6 +1,6 @@
 import type { ChatApi, SessionApi } from '@/types'
 
-/** SessionApi with harmless defaults, for tests and the preview harness. */
+/** SessionApi with harmless defaults for component tests. */
 export function createSessionApi(overrides: Partial<SessionApi> = {}): SessionApi {
   return {
     session: null,
@@ -12,7 +12,7 @@ export function createSessionApi(overrides: Partial<SessionApi> = {}): SessionAp
   }
 }
 
-/** ChatApi with an empty chat list and no-op actions, for tests and the preview harness. */
+/** ChatApi with an empty chat list and no-op actions for component tests. */
 export function createChatApi(overrides: Partial<ChatApi> = {}): ChatApi {
   return {
     chats: [],

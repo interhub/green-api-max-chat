@@ -58,9 +58,10 @@ function NewChatForm({ onClose }: { onClose(): void }) {
           setError(null)
         }}
         error={error}
-        hint="Поддерживаются номера России (+7) и Беларуси (+375)"
+        hint="Номера России (+7) и Беларуси (+375)"
+        reserveErrorLine
       />
-      <div className="mt-6 flex justify-end gap-2">
+      <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           Отмена
         </Button>
@@ -74,6 +75,7 @@ function NewChatForm({ onClose }: { onClose(): void }) {
 
 export function NewChatDialog({ open, onClose }: { open: boolean; onClose(): void }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const pressedOnBackdropRef = useRef(false)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -102,8 +104,15 @@ export function NewChatDialog({ open, onClose }: { open: boolean; onClose(): voi
         onClose()
       }}
       onKeyDown={handleKeyDown}
+      // The form covers the whole dialog box, so the dialog itself is the target only on the backdrop.
+      // A text selection that starts in the field and ends on the backdrop must not close it.
+      onPointerDown={(event) => {
+        pressedOnBackdropRef.current = event.target === event.currentTarget
+      }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        const fromBackdrop = pressedOnBackdropRef.current && event.target === event.currentTarget
+        pressedOnBackdropRef.current = false
+        if (fromBackdrop) onClose()
       }}
       className="m-auto w-[min(400px,calc(100vw-32px))] max-w-none overflow-visible rounded-modal border-0 bg-modal p-0 text-fg shadow-float open:motion-safe:animate-pop-in"
     >

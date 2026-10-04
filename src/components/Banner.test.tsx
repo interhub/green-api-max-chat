@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ChatApi, Notice } from '@/types'
 import { Banner } from './Banner'
 
@@ -86,5 +86,19 @@ describe('Banner', () => {
     const link = screen.getByRole('link', { name: 'Открыть кабинет' })
     expect(link).toHaveAttribute('href', 'https://console.green-api.com')
     expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('keeps one live region mounted and only changes its content', () => {
+    const view = renderWithProviders(<Banner notice={null} />)
+    const status = screen.getByRole('status')
+    expect(status).toBeEmptyDOMElement()
+
+    view.rerender(<Banner notice={{ kind: 'offline' }} />)
+    expect(screen.getByRole('status')).toBe(status)
+    expect(status).toHaveTextContent('Нет связи с GREEN-API. Пробуем подключиться снова.')
+
+    view.rerender(<Banner notice={null} />)
+    expect(screen.getByRole('status')).toBe(status)
+    expect(status).toBeEmptyDOMElement()
   })
 })

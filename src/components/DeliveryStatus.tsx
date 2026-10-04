@@ -11,10 +11,10 @@ const STATUS_LABELS: Record<MessageStatus, string> = {
 }
 
 const BUBBLE_TONES: Record<MessageStatus, string> = {
-  sending: 'text-[var(--bubble-time)]',
-  sent: 'text-[var(--bubble-time)]',
-  delivered: 'text-[var(--bubble-time)]',
-  read: 'text-[var(--bubble-read)]',
+  sending: 'text-bubble-tick',
+  sent: 'text-bubble-tick',
+  delivered: 'text-bubble-tick',
+  read: 'text-bubble-read',
   failed: 'text-icon-negative',
 }
 
@@ -53,7 +53,7 @@ function StatusIcon({ status }: { status: MessageStatus }) {
 
 interface DeliveryStatusProps {
   status: MessageStatus
-  /** "bubble" uses the bubble time color, "list" the chat list icon colors. */
+  /** "bubble" uses the bubble tick colors, "list" the chat list icon colors. */
   tone: 'bubble' | 'list'
   /** The chat list repeats the status of the conversation, so it stays out of the accessibility tree. */
   decorative?: boolean

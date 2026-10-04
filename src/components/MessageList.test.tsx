@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createChatApi } from '@/dev/fakes'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { createChatApi } from '@/test/fakes'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import { ChatContext } from '@/state/contexts'
 import type { Chat, ChatApi, ChatMessage } from '@/types'
 import { MessageList } from './MessageList'
@@ -27,14 +27,42 @@ function message(id: string, overrides: Partial<ChatMessage>): ChatMessage {
 }
 
 /** jsdom has no layout: give the log a fixed scroll geometry and a writable scrollTop. */
-function fakeScrollGeometry(element: HTMLElement, scrollTop: number) {
-  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 2000 })
+function fakeScrollGeometry(element: HTMLElement, scrollTop: number, scrollHeight = 2000) {
+  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: scrollHeight })
   Object.defineProperty(element, 'clientHeight', { configurable: true, value: 500 })
   Object.defineProperty(element, 'scrollTop', {
     configurable: true,
     writable: true,
     value: scrollTop,
   })
+}
+
+/** Records what MessageList observes and lets the test report a size change. */
+class FakeResizeObserver {
+  static last: FakeResizeObserver | null = null
+  readonly targets: Element[] = []
+  readonly notify: () => void
+
+  constructor(callback: () => void) {
+    this.notify = callback
+    FakeResizeObserver.last = this
+  }
+
+  observe(target: Element) {
+    this.targets.push(target)
+  }
+
+  disconnect() {
+    this.targets.length = 0
+  }
+}
+
+function chatTree(messages: ChatMessage[]) {
+  return (
+    <ChatContext.Provider value={createChatApi({ messages, activeChat: chat })}>
+      <MessageList chat={chat} />
+    </ChatContext.Provider>
+  )
 }
 
 function renderList(messages: ChatMessage[], target: Chat = chat) {
@@ -53,9 +81,10 @@ describe('MessageList', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
-  it('is a polite log with date separators', () => {
+  it('is a polite log of additions with date separators', () => {
     renderList([
       message('a', { timestamp: NOW - 3 * 24 * 60 * minute }),
       message('b', { timestamp: NOW - 24 * 60 * minute }),
@@ -63,6 +92,7 @@ describe('MessageList', () => {
     ])
     const log = screen.getByRole('log', { name: 'Сообщения' })
     expect(log).toHaveAttribute('aria-live', 'polite')
+    expect(log).toHaveAttribute('aria-relevant', 'additions')
     expect(within(log).getByText('1 октября')).toBeInTheDocument()
     expect(within(log).getByText('Вчера')).toBeInTheDocument()
     expect(within(log).getByText('Сегодня')).toBeInTheDocument()
@@ -161,11 +191,7 @@ describe('MessageList', () => {
 
   it('offers "Вниз" with the count of new incoming messages after the user scrolls up', () => {
     const first = [message('a', { timestamp: NOW - 5 * minute })]
-    const tree = (messages: ChatMessage[]) => (
-      <ChatContext.Provider value={createChatApi({ messages, activeChat: chat })}>
-        <MessageList chat={chat} />
-      </ChatContext.Provider>
-    )
+    const tree = chatTree
     const { rerender } = render(tree(first))
     const log = screen.getByRole('log', { name: 'Сообщения' })
     expect(screen.queryByRole('button', { name: 'Вниз' })).not.toBeInTheDocument()
@@ -187,5 +213,56 @@ describe('MessageList', () => {
       ]),
     )
     expect(log.scrollTop).toBe(2000)
+  })
+
+  it('keeps the error row of a failed last message in view while pinned to the bottom', () => {
+    const sending = message('a', { direction: 'out', status: 'sending' })
+    const { rerender } = render(chatTree([sending]))
+    const log = screen.getByRole('log', { name: 'Сообщения' })
+    fakeScrollGeometry(log, 1500)
+    fireEvent.scroll(log)
+
+    fakeScrollGeometry(log, 1500, 2028)
+    rerender(chatTree([{ ...sending, status: 'failed', error: 'Нет связи с GREEN-API.' }]))
+    expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
+    expect(log.scrollTop).toBe(2028)
+  })
+
+  it('follows any growth of the content while pinned, and only then', () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    render(chatTree([message('a', {})]))
+    const log = screen.getByRole('log', { name: 'Сообщения' })
+    const observer = FakeResizeObserver.last
+    expect(observer?.targets).toEqual([log, log.firstElementChild])
+
+    fakeScrollGeometry(log, 1500, 2100)
+    observer?.notify()
+    expect(log.scrollTop).toBe(2100)
+
+    fakeScrollGeometry(log, 300)
+    fireEvent.scroll(log)
+    fakeScrollGeometry(log, 300, 2200)
+    observer?.notify()
+    expect(log.scrollTop).toBe(300)
+  })
+
+  it('moves the focus from "Вниз" to the log before the button disappears', async () => {
+    const user = userEvent.setup()
+    render(chatTree([message('a', {})]))
+    const log = screen.getByRole('log', { name: 'Сообщения' })
+    const scrollTo = vi.fn()
+    Object.defineProperty(log, 'scrollTo', { configurable: true, value: scrollTo })
+    fakeScrollGeometry(log, 300)
+    fireEvent.scroll(log)
+
+    await user.click(screen.getByRole('button', { name: 'Вниз' }))
+    expect(log).toHaveFocus()
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 2000 }))
+  })
+
+  it('renders a message with an invalid timestamp without a time', () => {
+    renderList([message('a', { text: 'Сломанное время', timestamp: Number.NaN })])
+    expect(screen.getByText('Сломанное время')).toBeInTheDocument()
+    expect(document.querySelector('time')).toBeNull()
   })
 })

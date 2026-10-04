@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { ChatApi } from '@/types'
 import { Composer } from './Composer'
 

@@ -1,5 +1,5 @@
 /** Same breakpoint as web.max.ru: below it only one pane (list or conversation) is shown. */
-export const DESKTOP_QUERY = '(min-width: 926px)'
+const DESKTOP_QUERY = '(min-width: 926px)'
 
 function matches(query: string): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(query).matches

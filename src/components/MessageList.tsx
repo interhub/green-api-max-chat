@@ -2,7 +2,8 @@ import { CaretDownIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@/state'
 import type { Chat } from '@/types'
-import { formatDayLabel } from '@/ui/format'
+import { cx } from '@/ui/cx'
+import { formatDayLabel, isValidTimestamp } from '@/ui/format'
 import { prefersReducedMotion } from '@/ui/media'
 import { useNow } from '@/ui/useNow'
 import { MessageBubble } from './MessageBubble'
@@ -10,6 +11,8 @@ import { buildTimeline } from './timeline'
 
 /** Closer than this to the bottom counts as "at the bottom": new messages keep the view pinned. */
 const BOTTOM_THRESHOLD_PX = 80
+
+const CAPSULE = 'rounded-capsule bg-capsule text-bubble-description text-white backdrop-blur-[25px]'
 
 function distanceToBottom(element: HTMLElement): number {
   return element.scrollHeight - element.scrollTop - element.clientHeight
@@ -19,6 +22,8 @@ export function MessageList({ chat }: { chat: Chat }) {
   const { messages, retryMessage } = useChat()
   const now = useNow()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const bottomButtonRef = useRef<HTMLButtonElement>(null)
   const pinnedRef = useRef(true)
   const lengthRef = useRef(messages.length)
   const [atBottom, setAtBottom] = useState(true)
@@ -31,23 +36,29 @@ export function MessageList({ chat }: { chat: Chat }) {
     if (element) element.scrollTop = element.scrollHeight
   }, [])
 
+  // Any change of the messages (a new one, a status, the error row of a failed one) keeps a pinned view
+  // at the bottom; sending a message jumps to the bottom from anywhere.
   useLayoutEffect(() => {
     const element = scrollRef.current
     const grew = messages.length > lengthRef.current
     lengthRef.current = messages.length
-    if (!element || !grew) return
+    if (!element) return
     const last = messages.at(-1)
-    const sentHere = last?.direction === 'out' && last.status === 'sending'
-    if (sentHere || pinnedRef.current) element.scrollTop = element.scrollHeight
+    const sentHere = grew && last?.direction === 'out' && last.status === 'sending'
+    if (sentHere) pinnedRef.current = true
+    if (pinnedRef.current) element.scrollTop = element.scrollHeight
   }, [messages])
 
+  // Height changes that do not come from new data (window resize, font loading, wrapping) as well.
   useEffect(() => {
-    const element = scrollRef.current
-    if (!element || typeof ResizeObserver === 'undefined') return undefined
+    const scroller = scrollRef.current
+    const content = contentRef.current
+    if (!scroller || !content || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(() => {
-      if (pinnedRef.current) element.scrollTop = element.scrollHeight
+      if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight
     })
-    observer.observe(element)
+    observer.observe(scroller)
+    observer.observe(content)
     return () => observer.disconnect()
   }, [])
 
@@ -63,6 +74,8 @@ export function MessageList({ chat }: { chat: Chat }) {
   function scrollToBottom() {
     const element = scrollRef.current
     if (!element) return
+    // The button disappears at the bottom: keep the keyboard focus on the log it scrolled.
+    if (document.activeElement === bottomButtonRef.current) element.focus({ preventScroll: true })
     element.scrollTo({
       top: element.scrollHeight,
       behavior: prefersReducedMotion() ? 'auto' : 'smooth',
@@ -72,6 +85,7 @@ export function MessageList({ chat }: { chat: Chat }) {
   const unseen = atBottom
     ? 0
     : messages.slice(seenCount).filter((message) => message.direction === 'in').length
+  const empty = messages.length === 0
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -80,25 +94,30 @@ export function MessageList({ chat }: { chat: Chat }) {
         role="log"
         aria-label="Сообщения"
         aria-live="polite"
+        aria-relevant="additions"
         tabIndex={0}
         onScroll={handleScroll}
-        className="scroll-thin h-full overflow-y-auto overscroll-contain focus-visible:outline-offset-[-2px]"
+        className="scroll-thin h-full overflow-x-hidden overflow-y-auto overscroll-contain focus-visible:outline-offset-[-2px]"
       >
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center p-6">
-            <p className="rounded-capsule bg-capsule px-3 py-1.5 text-bubble-description text-white">
-              Напишите первое сообщение
-            </p>
-          </div>
-        ) : (
-          <div className="mx-auto flex min-h-full max-w-[860px] flex-col justify-end px-4 pt-2 pb-3">
-            {days.map((day) => (
+        <div
+          ref={contentRef}
+          className={cx(
+            'mx-auto flex min-h-full max-w-[860px] flex-col px-4 pt-2 pb-3',
+            empty ? 'items-center justify-center' : 'justify-end',
+          )}
+        >
+          {empty ? (
+            <p className={cx(CAPSULE, 'px-3 py-1.5')}>Напишите первое сообщение</p>
+          ) : (
+            days.map((day) => (
               <section key={day.key}>
-                <div className="flex justify-center py-1">
-                  <span className="rounded-capsule bg-capsule px-2 py-px text-bubble-description text-white">
-                    {formatDayLabel(day.timestamp, now)}
-                  </span>
-                </div>
+                {isValidTimestamp(day.timestamp) && (
+                  <div className="flex justify-center py-1">
+                    <span className={cx(CAPSULE, 'px-1.5 py-px')}>
+                      {formatDayLabel(day.timestamp, now)}
+                    </span>
+                  </div>
+                )}
                 {day.messages.map((item) => (
                   <MessageBubble
                     key={item.message.id}
@@ -111,12 +130,13 @@ export function MessageList({ chat }: { chat: Chat }) {
                   />
                 ))}
               </section>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
       {!atBottom && (
         <button
+          ref={bottomButtonRef}
           type="button"
           aria-label="Вниз"
           title="Вниз"

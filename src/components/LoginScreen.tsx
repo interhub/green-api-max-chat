@@ -5,6 +5,7 @@ import type { LoginResult } from '@/types'
 import { Button } from '@/ui/Button'
 import { Logo } from '@/ui/Logo'
 import { TextField } from '@/ui/TextField'
+import { ConsoleLink } from './ConsoleLink'
 import { ThemeToggleButton } from './ShellActions'
 
 type LoginField = 'idInstance' | 'apiTokenInstance' | 'apiUrl'
@@ -14,14 +15,11 @@ interface LoginFailure {
   field?: LoginField
 }
 
-const CONSOLE_URL = 'https://console.green-api.com'
-
 export function LoginScreen() {
   const { login, message } = useSession()
   const [idInstance, setIdInstance] = useState('')
-  const [apiTokenInstance, setApiTokenInstance] = useState('')
   const [apiUrl, setApiUrl] = useState('')
-  const [remember, setRemember] = useState(true)
+  const [remember, setRemember] = useState(false)
   const [showToken, setShowToken] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -53,7 +51,7 @@ export function LoginScreen() {
     try {
       result = await login({
         idInstance,
-        apiTokenInstance,
+        apiTokenInstance: tokenRef.current?.value ?? '',
         apiUrl: apiUrl.trim() ? apiUrl : undefined,
         remember,
       })
@@ -106,6 +104,7 @@ export function LoginScreen() {
               }}
               error={fieldError('idInstance')}
             />
+            {/* Uncontrolled: React mirrors a controlled value into the DOM value attribute. */}
             <TextField
               label="apiTokenInstance"
               name="apiTokenInstance"
@@ -114,11 +113,7 @@ export function LoginScreen() {
               autoCapitalize="off"
               spellCheck={false}
               inputRef={tokenRef}
-              value={apiTokenInstance}
-              onChange={(event) => {
-                setApiTokenInstance(event.target.value)
-                clearErrorOf('apiTokenInstance')
-              }}
+              onChange={() => clearErrorOf('apiTokenInstance')}
               error={fieldError('apiTokenInstance')}
               trailing={
                 <button
@@ -139,7 +134,7 @@ export function LoginScreen() {
                   type="checkbox"
                   checked={remember}
                   onChange={(event) => setRemember(event.target.checked)}
-                  className="peer size-5 cursor-pointer appearance-none rounded-md border-2 border-icon-mute transition-transform duration-100 checked:border-accent checked:bg-accent active:scale-[0.92]"
+                  className="peer size-5 cursor-pointer appearance-none rounded-md border-2 border-icon-3 transition-transform duration-100 checked:border-accent checked:bg-accent active:scale-[0.92]"
                 />
                 <svg
                   aria-hidden="true"
@@ -204,14 +199,9 @@ export function LoginScreen() {
           </form>
 
           <p className="mt-6 text-center">
-            <a
-              href={CONSOLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-sm text-detail font-medium text-themed hover:underline"
-            >
+            <ConsoleLink className="rounded-sm text-detail font-medium text-themed hover:underline">
               Где взять idInstance и apiTokenInstance?
-            </a>
+            </ConsoleLink>
           </p>
         </div>
       </main>

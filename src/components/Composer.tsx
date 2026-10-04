@@ -8,7 +8,6 @@ const MAX_LENGTH = 4000
 const COUNTER_FROM = 3500
 const LINE_HEIGHT_PX = 20
 const MAX_LINES = 6
-const VERTICAL_PADDING_PX = 32
 
 export function Composer({ chatId }: { chatId: string }) {
   const { sendMessage } = useChat()
@@ -16,16 +15,19 @@ export function Composer({ chatId }: { chatId: string }) {
   const fieldRef = useRef<HTMLTextAreaElement>(null)
   const canSend = text.trim().length > 0
 
+  // Next frame: a chat opened from the "Новый чат" dialog mounts while the modal dialog still makes
+  // the page inert, and closing the dialog moves the focus back to its opener.
   useEffect(() => {
-    if (isDesktop()) fieldRef.current?.focus()
+    if (!isDesktop()) return undefined
+    const frame = requestAnimationFrame(() => fieldRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
   }, [chatId])
 
   useLayoutEffect(() => {
     const field = fieldRef.current
     if (!field) return
     field.style.height = 'auto'
-    const limit = LINE_HEIGHT_PX * MAX_LINES + VERTICAL_PADDING_PX
-    field.style.height = `${Math.min(field.scrollHeight, limit)}px`
+    field.style.height = `${Math.min(field.scrollHeight, LINE_HEIGHT_PX * MAX_LINES)}px`
   }, [text])
 
   function submit() {
@@ -44,25 +46,27 @@ export function Composer({ chatId }: { chatId: string }) {
   }
 
   return (
-    <div className="relative shrink-0 px-4 pb-4">
+    <div className="relative shrink-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
       <form
         onSubmit={(event) => {
           event.preventDefault()
           submit()
         }}
-        className="mx-auto flex max-w-[759px] items-end rounded-bubble bg-float shadow-float keyboard:has-[textarea:focus-visible]:outline-2 keyboard:has-[textarea:focus-visible]:outline-offset-0 keyboard:has-[textarea:focus-visible]:outline-[#007aff]"
+        className="mx-auto flex max-w-[759px] items-end rounded-bubble bg-float shadow-float keyboard:has-[textarea:focus-visible]:outline-2 keyboard:has-[textarea:focus-visible]:outline-offset-0 keyboard:has-[textarea:focus-visible]:outline-focus"
       >
-        <textarea
-          ref={fieldRef}
-          aria-label="Сообщение"
-          placeholder="Сообщение"
-          rows={1}
-          maxLength={MAX_LENGTH}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={handleKeyDown}
-          className="scroll-thin block max-h-[152px] min-h-[52px] flex-1 resize-none bg-transparent py-4 pl-4 text-body text-fg caret-accent outline-none placeholder:text-fg-3"
-        />
+        <div className="flex min-w-0 flex-1 py-4 pl-4">
+          <textarea
+            ref={fieldRef}
+            aria-label="Сообщение"
+            placeholder="Сообщение"
+            rows={1}
+            maxLength={MAX_LENGTH}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={handleKeyDown}
+            className="scroll-thin block max-h-[120px] min-h-5 min-w-0 flex-1 resize-none bg-transparent text-body text-fg caret-accent outline-none placeholder:text-fg-3"
+          />
+        </div>
         {text.length >= COUNTER_FROM && (
           <span
             className={cx(

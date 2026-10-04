@@ -10,7 +10,7 @@ const BROWSER_BAR_COLORS: Record<Theme, string> = {
   light: '#ffffff',
 }
 
-export function isTheme(value: unknown): value is Theme {
+function isTheme(value: unknown): value is Theme {
   return value === 'dark' || value === 'light'
 }
 

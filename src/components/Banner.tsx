@@ -10,10 +10,9 @@ import { useChat } from '@/state'
 import type { InstanceState, Notice } from '@/types'
 import { Button } from '@/ui/Button'
 import { Spinner } from '@/ui/Spinner'
+import { ConsoleLink } from './ConsoleLink'
 
-const CONSOLE_URL = 'https://console.green-api.com'
-
-interface BannerContent {
+interface NoticeContent {
   icon: ReactNode
   text: string
   hint?: string
@@ -23,7 +22,7 @@ interface BannerContent {
 
 const CONSOLE_ACTION = { action: 'console', actionLabel: 'Открыть кабинет' } as const
 
-function describeInstanceState(state: InstanceState): BannerContent {
+function describeInstanceState(state: InstanceState): NoticeContent {
   const icon = <WarningCircleIcon size={20} className="text-icon-attention" />
   switch (state) {
     case 'starting':
@@ -50,6 +49,7 @@ function describeInstanceState(state: InstanceState): BannerContent {
       }
     case 'notAuthorized':
     case 'authorized':
+      // 'authorized' never comes with this notice; it only keeps the switch exhaustive.
       return {
         icon,
         text: 'Инстанс не авторизован в MAX. Отсканируйте QR-код в личном кабинете GREEN-API.',
@@ -58,7 +58,7 @@ function describeInstanceState(state: InstanceState): BannerContent {
   }
 }
 
-function describe(notice: Notice): BannerContent {
+function describeNotice(notice: Notice): NoticeContent {
   switch (notice.kind) {
     case 'offline':
       return {
@@ -102,11 +102,10 @@ function describe(notice: Notice): BannerContent {
   }
 }
 
-/** Status strip under the conversation header (or above the chat list) for the current Notice. */
-export function Banner({ notice }: { notice: Notice }) {
+function NoticeStrip({ notice }: { notice: Notice }) {
   const { enableNotifications } = useChat()
   const [pending, setPending] = useState(false)
-  const content = describe(notice)
+  const content = describeNotice(notice)
 
   async function handleEnable() {
     setPending(true)
@@ -119,9 +118,8 @@ export function Banner({ notice }: { notice: Notice }) {
 
   return (
     <div
-      role="status"
       data-notice={notice.kind}
-      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-divider-soft bg-panel px-4 py-2.5 motion-safe:animate-fade-in"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-divider-soft bg-panel px-4 py-2.5 motion-safe:animate-fade-in"
     >
       <div className="flex min-w-[min(100%,240px)] flex-1 items-start gap-3">
         <span className="mt-px flex size-5 shrink-0 items-center justify-center">
@@ -138,16 +136,23 @@ export function Banner({ notice }: { notice: Notice }) {
         </Button>
       )}
       {content.action === 'console' && (
-        <a
-          href={CONSOLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-8 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-action-small text-themed transition-transform duration-100 hover:bg-ghost-hover active:scale-[0.98] active:bg-ghost-pressed"
-        >
+        <ConsoleLink className="ml-8 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-action-small text-themed transition-transform duration-100 hover:bg-ghost-hover active:scale-[0.98] active:bg-ghost-pressed">
           {content.actionLabel}
           <ArrowSquareOutIcon size={16} aria-hidden="true" />
-        </a>
+        </ConsoleLink>
       )}
+    </div>
+  )
+}
+
+/**
+ * Status strip under the conversation header (or above the chat list). The live region stays mounted
+ * and only its content changes, so screen readers announce every new notice.
+ */
+export function Banner({ notice }: { notice: Notice | null }) {
+  return (
+    <div role="status" className="shrink-0">
+      {notice && <NoticeStrip key={notice.kind} notice={notice} />}
     </div>
   )
 }

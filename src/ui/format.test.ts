@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  formatClock,
-  formatDayLabel,
-  formatListTime,
-  formatPhone,
-  getInitials,
-  pickByKey,
-} from './format'
+import { formatClock, formatDayLabel, formatListTime, getInitials, pickByKey } from './format'
 
 /** Sunday, 4 October 2026, 14:30 local time. */
 const NOW = new Date(2026, 9, 4, 14, 30).getTime()
@@ -50,17 +43,6 @@ describe('formatDayLabel', () => {
 describe('formatClock', () => {
   it('pads hours and minutes', () => {
     expect(formatClock(at(9, 4, 7, 3))).toBe('07:03')
-  })
-})
-
-describe('formatPhone', () => {
-  it('formats Russian and Belarusian numbers', () => {
-    expect(formatPhone('79001234567')).toBe('+7 900 123-45-67')
-    expect(formatPhone('375291234567')).toBe('+375 29 123-45-67')
-  })
-
-  it('falls back to a plus sign and the digits', () => {
-    expect(formatPhone('4915123456789')).toBe('+4915123456789')
   })
 })
 

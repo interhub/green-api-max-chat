@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cx } from './cx'
 import { Spinner } from './Spinner'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary'
 type ButtonSize = 'small' | 'medium' | 'large'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -12,22 +12,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
 }
 
-const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-accent text-white hover:bg-accent-hover active:bg-accent-pressed disabled:bg-accent-disabled disabled:text-on-disabled',
-  secondary:
-    'bg-secondary text-fg hover:bg-secondary-hover active:bg-secondary-pressed disabled:text-fg-mute',
-  ghost:
-    'bg-transparent text-themed hover:bg-ghost-hover active:bg-ghost-pressed disabled:text-fg-mute',
+/** Colors at rest, and the hover, pressed and disabled states that a loading button does not show. */
+const VARIANTS: Record<ButtonVariant, { base: string; states: string }> = {
+  primary: {
+    base: 'bg-accent text-white',
+    states:
+      'hover:bg-accent-hover active:bg-accent-pressed disabled:bg-accent-disabled disabled:text-on-disabled',
+  },
+  secondary: {
+    base: 'bg-secondary text-fg',
+    states: 'hover:bg-secondary-hover active:bg-secondary-pressed disabled:text-fg-mute',
+  },
 }
 
-const LOADING_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white',
-  secondary: 'bg-secondary text-fg',
-  ghost: 'bg-transparent text-themed',
-}
-
-/** MAX button sizes: xsmall h32 r8, small h40 r12, medium h52 r16. */
+/** Our small, medium and large are the MAX xsmall (h32 r8), small (h40 r12) and medium (h52 r16). */
 const SIZES: Record<ButtonSize, string> = {
   small: 'h-8 rounded-lg px-3 text-action-small',
   medium: 'h-10 rounded-xl px-4 text-action',
@@ -50,9 +48,10 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap transition-transform duration-100 select-none enabled:active:scale-[0.98] disabled:cursor-not-allowed',
+        'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap transition-transform duration-100 select-none enabled:active:scale-[0.98]',
         SIZES[size],
-        loading ? cx(LOADING_VARIANTS[variant], 'cursor-progress') : VARIANTS[variant],
+        VARIANTS[variant].base,
+        loading ? 'cursor-progress' : cx(VARIANTS[variant].states, 'disabled:cursor-not-allowed'),
         className,
       )}
       {...rest}

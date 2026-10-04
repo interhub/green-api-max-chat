@@ -13,7 +13,7 @@ const fake = vi.hoisted(() => ({
 
 vi.mock('@/state', async () => {
   const contexts = await import('@/state/contexts')
-  const { createChatApi, createSessionApi } = await import('@/dev/fakes')
+  const { createChatApi, createSessionApi } = await import('@/test/fakes')
   return {
     ...contexts,
     SessionProvider: ({ children }: { children: ReactNode }) => (

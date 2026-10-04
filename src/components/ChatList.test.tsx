@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { Chat, ChatApi, ChatMessage } from '@/types'
 import { ChatList } from './ChatList'
 
@@ -77,7 +77,7 @@ describe('ChatList', () => {
     vi.useRealTimers()
   })
 
-  it('lists chats as buttons named by the title, with previews, times and badges', () => {
+  it('lists chats as buttons named by the title, with last messages, times and badges', () => {
     renderList()
     const list = screen.getByRole('list', { name: 'Список чатов' })
     const items = within(list).getAllByRole('button')
@@ -114,40 +114,22 @@ describe('ChatList', () => {
     expect(openChat).toHaveBeenCalledWith('1')
   })
 
-  it('filters by title and by phone digits', async () => {
-    const user = userEvent.setup()
-    renderList()
-    const search = screen.getByRole('searchbox', { name: 'Поиск' })
-
-    await user.type(search, 'анна')
-    expect(within(screen.getByRole('list')).getAllByRole('button')).toHaveLength(1)
-
-    await user.clear(search)
-    await user.type(search, '999 123')
-    expect(screen.getByRole('button', { name: /^\+7 999 123-45-67/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Анна/ })).not.toBeInTheDocument()
-
-    await user.clear(search)
-    await user.type(search, 'нет такого')
-    expect(screen.getByText('Ничего не найдено')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Очистить поиск' }))
-    expect(search).toHaveValue('')
-    expect(within(screen.getByRole('list')).getAllByRole('button')).toHaveLength(4)
-  })
-
-  it('offers to start the first chat when the list is empty', async () => {
-    const user = userEvent.setup()
-    const { onNewChat } = renderList({ chats: [], lastMessages: {} })
+  it('shows only a hint when there are no chats yet', () => {
+    renderList({ chats: [], lastMessages: {} })
 
     expect(screen.getByText('Чатов пока нет')).toBeInTheDocument()
     expect(screen.getByText('Начните диалог по номеру телефона')).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Список чатов' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Новый чат' })).toHaveLength(1)
+  })
 
-    const buttons = screen.getAllByRole('button', { name: 'Новый чат' })
-    expect(buttons).toHaveLength(2)
-    for (const button of buttons) await user.click(button)
-    expect(onNewChat).toHaveBeenCalledTimes(2)
+  it('starts a new chat from the header button', async () => {
+    const user = userEvent.setup()
+    const { onNewChat } = renderList()
+
+    await user.click(screen.getByRole('button', { name: 'Новый чат' }))
+    expect(onNewChat).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
   it('shows the notice above the list while no conversation is open', () => {
@@ -155,5 +137,10 @@ describe('ChatList', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Нет связи с GREEN-API. Пробуем подключиться снова.',
     )
+  })
+
+  it('keeps the status region empty while the conversation shows the notice', () => {
+    renderList({ notice: { kind: 'offline' }, activeChat: chats[0] ?? null })
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 })

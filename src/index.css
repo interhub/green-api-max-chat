@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 /*
- * MAX "space" theme tokens (web.max.ru), names kept from the site CSS. Negative text, the light
- * attention icon, light links, light outgoing time and light author colors are adjusted to reach
- * WCAG AA contrast.
+ * MAX "space" theme tokens (web.max.ru), names kept from the site CSS. Text tokens that miss WCAG AA
+ * (4.5:1) in MAX are darkened or lightened: secondary text, links, capsules, negative text, bubble
+ * time and author colors. Filled brand controls (buttons, badges) keep the MAX blue #007aff.
  */
 :root,
 html[data-theme='dark'] {
@@ -21,7 +21,7 @@ html[data-theme='dark'] {
   --text-secondary: #fffc;
   --text-tertiary: #ffffffa3;
   --text-mute: #fff6;
-  --text-themed: #007aff;
+  --text-themed: #409cff;
   --text-negative: #ff6679;
   --text-positive: #2bc644;
 
@@ -51,6 +51,7 @@ html[data-theme='dark'] {
   --states-background-card-pressed: #1f2026;
   --states-background-card-selected: #2c2d37;
 
+  --controls-active: #007aff;
   --controls-inactive: #ffffff17;
   --counter-themed: #007aff;
   --float-scroll-bar: #ffffff1f;
@@ -69,21 +70,22 @@ html[data-theme='dark'] {
   --bubble-in-step-2: #373a4e;
   --bubble-in-step-3: #32343d;
   --bubble-in-text: #fff;
-  --bubble-in-text-secondary: #ffffff85;
+  --bubble-in-text-secondary: #ffffffa3;
   --bubble-in-time: #ffffffa3;
   --bubble-in-link: #fff;
   --bubble-out-step-1: #8849b4;
   --bubble-out-step-2: #735acd;
   --bubble-out-step-3: #5d6ae5;
   --bubble-out-text: #fff;
-  --bubble-out-text-secondary: #ffffffa3;
-  --bubble-out-time: #ffffffa3;
+  --bubble-out-text-secondary: #fff;
+  --bubble-out-time: #fff;
+  --bubble-out-tick: #ffffff8f;
   --bubble-out-link: #fff;
   --bubble-out-read: #fff;
 
   --author-malachite: #5ec7ce;
   --author-dark-sky: #78b1f5;
-  --author-lilac: #a79dff;
+  --author-lilac: #b3abff;
   --author-orchid: #f78fb7;
   --author-tangerine: #f2ab7d;
 }
@@ -101,9 +103,9 @@ html[data-theme='light'] {
 
   --text-primary: #060708;
   --text-secondary: #060708ad;
-  --text-tertiary: #06070885;
+  --text-tertiary: #0607089e;
   --text-mute: #06070866;
-  --text-themed: #007aff;
+  --text-themed: #0066d6;
   --text-negative: #e0262f;
   --text-positive: #1abe43;
 
@@ -133,6 +135,7 @@ html[data-theme='light'] {
   --states-background-card-pressed: #fafafa;
   --states-background-card-selected: #007aff14;
 
+  --controls-active: #007aff;
   --controls-inactive: #09090914;
   --counter-themed: #007aff;
   --float-scroll-bar: #0c0d0e3d;
@@ -145,21 +148,22 @@ html[data-theme='light'] {
   --chat-ground-step-2: #80bcff;
   --chat-pattern-icon: #20509d2e;
   --chat-background-pattern-color: #007aff4d;
-  --capsule-outside: #0f8ec285;
+  --capsule-outside: #0a6c94e6;
 
   --bubble-in-step-1: #fff;
   --bubble-in-step-2: #fff;
   --bubble-in-step-3: #fff;
   --bubble-in-text: #060708;
-  --bubble-in-text-secondary: #06070885;
-  --bubble-in-time: #06070885;
+  --bubble-in-text-secondary: #0607089e;
+  --bubble-in-time: #0607089e;
   --bubble-in-link: #0670a0;
   --bubble-out-step-1: #e9fdff;
   --bubble-out-step-2: #e9fdff;
   --bubble-out-step-3: #e9fdff;
   --bubble-out-text: #011c29;
-  --bubble-out-text-secondary: #011c2985;
+  --bubble-out-text-secondary: #011c29a6;
   --bubble-out-time: #0670a0;
+  --bubble-out-tick: #0670a080;
   --bubble-out-link: #0670a0;
   --bubble-out-read: #0f8ec2;
 
@@ -188,6 +192,10 @@ html[data-theme='light'] {
   --text-title: 17px;
   --text-title--line-height: 24px;
   --text-title--font-weight: 600;
+  --text-chat-title: 16px;
+  --text-chat-title--line-height: 20px;
+  --text-chat-title--letter-spacing: 0.15px;
+  --text-chat-title--font-weight: 600;
   --text-body: 16px;
   --text-body--line-height: 20px;
   --text-body--letter-spacing: 0.15px;
@@ -289,8 +297,14 @@ html[data-theme='light'] {
   --color-secondary-hover: var(--states-button-secondary-hover);
   --color-secondary-pressed: var(--states-button-secondary-pressed);
   --color-control-off: var(--controls-inactive);
+  --color-focus: var(--controls-active);
   --color-counter: var(--counter-themed);
   --color-capsule: var(--capsule-outside);
+  --color-bubble-muted: var(--bubble-text-secondary);
+  --color-bubble-time: var(--bubble-time);
+  --color-bubble-tick: var(--bubble-tick);
+  --color-bubble-read: var(--bubble-read);
+  --color-bubble-link: var(--bubble-link);
 
   --shadow-float:
     0 4px 16px 0 var(--shadow-elevation-3-primary), 0 0 2px 0 var(--shadow-elevation-3-secondary);
@@ -313,17 +327,12 @@ html[data-theme='light'] {
   }
 
   :focus-visible {
-    outline: 2px solid #007aff;
+    outline: 2px solid var(--controls-active);
     outline-offset: 2px;
   }
 
   dialog::backdrop {
     background-color: rgb(12 13 14 / 0.56);
-  }
-
-  input[type='search']::-webkit-search-decoration,
-  input[type='search']::-webkit-search-cancel-button {
-    -webkit-appearance: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -394,6 +403,7 @@ html[data-theme='light'] {
   --bubble-text: var(--bubble-in-text);
   --bubble-text-secondary: var(--bubble-in-text-secondary);
   --bubble-time: var(--bubble-in-time);
+  --bubble-tick: var(--bubble-in-time);
   --bubble-link: var(--bubble-in-link);
   --bubble-read: var(--bubble-in-time);
 }
@@ -405,6 +415,7 @@ html[data-theme='light'] {
   --bubble-text: var(--bubble-out-text);
   --bubble-text-secondary: var(--bubble-out-text-secondary);
   --bubble-time: var(--bubble-out-time);
+  --bubble-tick: var(--bubble-out-tick);
   --bubble-link: var(--bubble-out-link);
   --bubble-read: var(--bubble-out-read);
 }

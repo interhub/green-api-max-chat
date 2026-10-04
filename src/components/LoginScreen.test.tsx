@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithProviders } from '@/dev/renderWithProviders'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { LoginResult, SessionApi } from '@/types'
 import { LoginScreen } from './LoginScreen'
 
@@ -25,10 +25,9 @@ describe('LoginScreen', () => {
     expect(screen.getByLabelText('idInstance')).toHaveAttribute('inputmode', 'numeric')
     expect(
       screen.getByRole('checkbox', { name: 'Запомнить меня на этом устройстве' }),
-    ).toBeChecked()
+    ).not.toBeChecked()
 
     await fillCredentials(user)
-    await user.click(screen.getByRole('checkbox', { name: 'Запомнить меня на этом устройстве' }))
     await user.click(screen.getByRole('button', { name: 'Войти' }))
 
     expect(login).toHaveBeenCalledWith({
@@ -37,6 +36,29 @@ describe('LoginScreen', () => {
       apiUrl: undefined,
       remember: false,
     })
+  })
+
+  it('keeps the session on this device only when "Запомнить меня" is checked', async () => {
+    const login = vi.fn<SessionApi['login']>().mockResolvedValue({ ok: true })
+    const user = userEvent.setup()
+    renderLogin({ login })
+
+    await fillCredentials(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Запомнить меня на этом устройстве' }))
+    await user.click(screen.getByRole('button', { name: 'Войти' }))
+
+    expect(login).toHaveBeenCalledWith(expect.objectContaining({ remember: true }))
+  })
+
+  it('never writes the token into the value attribute of the field', async () => {
+    const user = userEvent.setup()
+    renderLogin()
+    const token = screen.getByLabelText('apiTokenInstance')
+
+    await user.type(token, 'secret-token')
+    expect(token).toHaveValue('secret-token')
+    expect(token).not.toHaveAttribute('value')
+    expect(document.body.innerHTML).not.toContain('secret-token')
   })
 
   it('shows a field error under the field named by the result and focuses it', async () => {
@@ -76,6 +98,28 @@ describe('LoginScreen', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Нет связи с GREEN-API.')
     expect(screen.getByLabelText('idInstance')).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('opens the closed advanced section and focuses API URL for its error', async () => {
+    const login = vi.fn<SessionApi['login']>().mockResolvedValue({
+      ok: false,
+      field: 'apiUrl',
+      error: 'Укажите API URL, начинающийся с https://',
+    })
+    const user = userEvent.setup()
+    renderLogin({ login })
+    const details = screen.getByText('Дополнительно').closest('details')
+    expect(details).not.toHaveAttribute('open')
+
+    await fillCredentials(user)
+    await user.click(screen.getByRole('button', { name: 'Войти' }))
+
+    const apiUrl = screen.getByLabelText('API URL')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Укажите API URL')
+    expect(details).toHaveAttribute('open')
+    expect(apiUrl).toHaveFocus()
+    expect(apiUrl).toHaveAttribute('aria-invalid', 'true')
+    expect(apiUrl).toHaveAccessibleDescription(/^Укажите API URL, начинающийся с https:\/\//)
   })
 
   it('opens the advanced section for an API URL error and passes the URL', async () => {
@@ -123,17 +167,20 @@ describe('LoginScreen', () => {
     expect(screen.getByRole('button', { name: 'Войти' })).toBeEnabled()
   })
 
-  it('shows and hides the token', async () => {
+  it('shows and hides the token without losing it', async () => {
     const user = userEvent.setup()
     renderLogin()
     const token = screen.getByLabelText('apiTokenInstance')
     expect(token).toHaveAttribute('type', 'password')
+    await user.type(token, 'secret-token')
 
     await user.click(screen.getByRole('button', { name: 'Показать токен' }))
     expect(token).toHaveAttribute('type', 'text')
+    expect(token).toHaveValue('secret-token')
 
     await user.click(screen.getByRole('button', { name: 'Скрыть токен' }))
     expect(token).toHaveAttribute('type', 'password')
+    expect(token).toHaveValue('secret-token')
   })
 
   it('shows the reason of a forced logout and the console link', () => {

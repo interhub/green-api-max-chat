@@ -19,6 +19,11 @@ function pad(value: number): string {
   return String(value).padStart(2, '0')
 }
 
+/** False for NaN and for values outside the Date range, which make toISOString() throw. */
+export function isValidTimestamp(timestamp: number): boolean {
+  return !Number.isNaN(new Date(timestamp).getTime())
+}
+
 export function startOfDay(timestamp: number): number {
   const date = new Date(timestamp)
   date.setHours(0, 0, 0, 0)
@@ -26,7 +31,7 @@ export function startOfDay(timestamp: number): number {
 }
 
 /** Calendar days from `from` to `to` in local time; rounding keeps it right across DST changes. */
-export function daysBetween(from: number, to: number): number {
+function daysBetween(from: number, to: number): number {
   return Math.round((startOfDay(to) - startOfDay(from)) / DAY_MS)
 }
 
@@ -61,17 +66,6 @@ export function formatDayLabel(timestamp: number, now: number): string {
     : `${label} ${date.getFullYear()}`
 }
 
-/** "+7 900 123-45-67" for Russia, "+375 29 123-45-67" for Belarus, "+<digits>" otherwise. */
-export function formatPhone(digits: string): string {
-  if (/^7\d{10}$/.test(digits)) {
-    return `+7 ${digits.slice(1, 4)} ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9)}`
-  }
-  if (/^375\d{9}$/.test(digits)) {
-    return `+375 ${digits.slice(3, 5)} ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10)}`
-  }
-  return `+${digits}`
-}
-
 /** Up to two initials from the words that start with a letter; "" for a title without letters. */
 export function getInitials(title: string): string {
   return title
@@ -84,7 +78,7 @@ export function getInitials(title: string): string {
 }
 
 /** Stable small hash: the same chat always gets the same avatar color. */
-export function hashString(value: string): number {
+function hashString(value: string): number {
   let hash = 0
   for (let index = 0; index < value.length; index += 1) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0
